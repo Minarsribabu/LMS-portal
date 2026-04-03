@@ -1,0 +1,26 @@
+# Prometheus Configuration — LMS Portal
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  # ─── Node.js Backend Metrics (prom-client) ───
+  - job_name: 'lms-backend'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['lms-backend:5000']
+        labels:
+          service: 'backend'
+
+  # ─── FastAPI ML Service Metrics ───
+  - job_name: 'lms-ml'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['lms-ml:8000']
+        labels:
+          service: 'ml-service'
+
+  # ─── Prometheus self-monitoring ───
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']

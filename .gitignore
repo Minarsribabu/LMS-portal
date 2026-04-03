@@ -1,0 +1,15 @@
+# .gitignore for LMS Portal
+node_modules/
+.env
+*.log
+dist/
+build/
+__pycache__/
+*.pyc
+.venv/
+venv/
+mongo-data/
+prometheus-data/
+grafana-data/
+.DS_Store
+Thumbs.db

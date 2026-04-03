@@ -1,0 +1,116 @@
+# LMS Portal — Docker Compose
+# Spin up the full stack: docker compose up --build
+
+services:
+
+  # ─── Nginx Reverse Proxy (Entry Point) ───
+  lms-nginx:
+    build: ./nginx
+    container_name: lms-nginx
+    ports:
+      - "80:80"
+    depends_on:
+      - lms-frontend
+      - lms-backend
+      - lms-ml
+      - lms-grafana
+    networks:
+      - lms-network
+    restart: unless-stopped
+
+  # ─── React Frontend ───
+  lms-frontend:
+    build: ./frontend
+    container_name: lms-frontend
+    ports:
+      - "3000:80"
+    networks:
+      - lms-network
+    restart: unless-stopped
+
+  # ─── Node.js Backend ───
+  lms-backend:
+    build: ./backend
+    container_name: lms-backend
+    ports:
+      - "5000:5000"
+    environment:
+      - PORT=5000
+      - MONGO_URI=mongodb://lms-mongo:27017/lms
+      - ML_SERVICE_URL=http://lms-ml:8000
+    depends_on:
+      - lms-mongo
+      - lms-ml
+    networks:
+      - lms-network
+    restart: unless-stopped
+
+  # ─── FastAPI ML Service ───
+  lms-ml:
+    build: ./ml-service
+    container_name: lms-ml
+    ports:
+      - "8000:8000"
+    networks:
+      - lms-network
+    restart: unless-stopped
+
+  # ─── MongoDB ───
+  lms-mongo:
+    image: mongo:7
+    container_name: lms-mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    networks:
+      - lms-network
+    restart: unless-stopped
+
+  # ─── Prometheus ───
+  lms-prometheus:
+    image: prom/prometheus:latest
+    container_name: lms-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.retention.time=7d'
+    depends_on:
+      - lms-backend
+      - lms-ml
+    networks:
+      - lms-network
+    restart: unless-stopped
+
+  # ─── Grafana ───
+  lms-grafana:
+    image: grafana/grafana:latest
+    container_name: lms-grafana
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_SERVER_ROOT_URL=http://localhost:3001
+      - GF_SERVER_SERVE_FROM_SUB_PATH=false
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - lms-prometheus
+    networks:
+      - lms-network
+    restart: unless-stopped
+
+volumes:
+  mongo-data:
+  prometheus-data:
+  grafana-data:
+
+networks:
+  lms-network:
+    driver: bridge

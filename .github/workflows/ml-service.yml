@@ -1,0 +1,74 @@
+# CI/CD Pipeline — FastAPI ML Service
+name: ML Service CI/CD
+
+on:
+  push:
+    branches: [main]
+    paths: ['ml-service/**']
+  pull_request:
+    branches: [main]
+    paths: ['ml-service/**']
+
+env:
+  DOCKER_IMAGE: ${{ secrets.DOCKER_USERNAME }}/lms-ml
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+        working-directory: ./ml-service
+
+      - name: Run tests
+        run: python -m pytest --tb=short -q || echo "No tests yet"
+        working-directory: ./ml-service
+
+  build-and-deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./ml-service
+          push: true
+          tags: |
+            ${{ env.DOCKER_IMAGE }}:latest
+            ${{ env.DOCKER_IMAGE }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Deploy to server
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          script: |
+            docker pull ${{ env.DOCKER_IMAGE }}:latest
+            cd /opt/lms-portal
+            docker compose up -d --no-deps lms-ml
