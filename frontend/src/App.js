@@ -1,63 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Link, Navigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
 
+// Pages
+import Home from './pages/Home';
+import Login from './pages/Login';
+import Register from './pages/Register';
+import UserDashboard from './pages/UserDashboard';
+import AdminDashboard from './pages/AdminDashboard';
+import ProtectedRoute from './components/ProtectedRoute';
+import ProfileDropdown from './components/ProfileDropdown';
+
 const API_BASE = process.env.REACT_APP_API_URL || '/api';
-
-/* ─── Landing Page ─── */
-function Home() {
-  return (
-    <div className="page">
-      <section className="hero">
-        <div className="hero-glow" />
-        <h1 className="hero-title">
-          <span className="gradient-text">Learn. Build. Grow.</span>
-        </h1>
-        <p className="hero-subtitle">
-          Your skill development platform — watch recorded sessions, track progress, and level up your engineering career.
-        </p>
-        <div className="hero-actions">
-          <Link to="/predict" className="btn btn-primary">Try Skill Predictor</Link>
-          <a href="#courses" className="btn btn-outline">Browse Courses</a>
-        </div>
-      </section>
-
-      <section id="courses" className="section">
-        <h2 className="section-title">Featured Courses</h2>
-        <div className="card-grid">
-          {['Docker & Containers', 'CI/CD Pipelines', 'Cloud Deployment', 'Monitoring & Observability'].map((course, i) => (
-            <div key={i} className="card">
-              <div className={`card-icon icon-${i}`}>📚</div>
-              <h3>{course}</h3>
-              <p>Master the fundamentals with hands-on recorded sessions and real-world projects.</p>
-              <div className="card-footer">
-                <span className="badge">12 Sessions</span>
-                <span className="badge badge-green">Beginner</span>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <section className="section section-dark">
-        <h2 className="section-title">Platform Stats</h2>
-        <div className="stats-row">
-          {[
-            { value: '500+', label: 'Recorded Sessions' },
-            { value: '2,000+', label: 'Students Enrolled' },
-            { value: '50+', label: 'Skill Tracks' },
-            { value: '95%', label: 'Completion Rate' },
-          ].map((stat, i) => (
-            <div key={i} className="stat-card">
-              <div className="stat-value">{stat.value}</div>
-              <div className="stat-label">{stat.label}</div>
-            </div>
-          ))}
-        </div>
-      </section>
-    </div>
-  );
-}
 
 /* ─── Skill Predictor Page (calls Backend → ML Service) ─── */
 function Predict() {
@@ -156,28 +110,106 @@ function Predict() {
   );
 }
 
-/* ─── Main App ─── */
-function App() {
+/* ─── Unauthorized Page ─── */
+function Unauthorized() {
   return (
-    <Router>
+    <div className="page">
+      <section className="section">
+        <div style={{ textAlign: 'center', padding: '60px 20px' }}>
+          <h1 style={{ fontSize: '48px', marginBottom: '20px' }}>403</h1>
+          <h2>Unauthorized Access</h2>
+          <p style={{ color: '#666', marginBottom: '30px' }}>
+            You don't have permission to access this resource.
+          </p>
+          <Link to="/" className="btn btn-primary">Go Home</Link>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+/* ─── Main App ─── */
+function AppShell() {
+  const location = useLocation();
+  const isAuthenticated = !!localStorage.getItem('token');
+  const user = JSON.parse(localStorage.getItem('user') || '{}');
+  const hideGlobalLayout = location.pathname.startsWith('/admin-dashboard') || location.pathname.startsWith('/user-dashboard');
+
+  return (
+    <>
+      {!hideGlobalLayout && (
       <nav className="navbar">
         <Link to="/" className="nav-brand">
           <span className="nav-logo">🎓</span> LMS Portal
         </Link>
         <div className="nav-links">
           <Link to="/">Home</Link>
-          <Link to="/predict">Skill Predictor</Link>
+          {isAuthenticated && user?.role === 'user' && <Link to="/predict">Skill Predictor</Link>}
+          {!isAuthenticated && (
+            <>
+              <Link to="/login">Login</Link>
+              <Link to="/register">Register</Link>
+            </>
+          )}
+          {isAuthenticated && <ProfileDropdown user={user} />}
         </div>
       </nav>
+      )}
       <Routes>
         <Route path="/" element={<Home />} />
-        <Route path="/predict" element={<Predict />} />
+        <Route
+          path="/predict"
+          element={
+            <ProtectedRoute requiredRole="user">
+              <Predict />
+            </ProtectedRoute>
+          }
+        />
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
+        <Route 
+          path="/user-dashboard" 
+          element={
+            <ProtectedRoute requiredRole="user">
+              <UserDashboard />
+            </ProtectedRoute>
+          } 
+        />
+        <Route
+          path="/user-dashboard/*"
+          element={
+            <ProtectedRoute requiredRole="user">
+              <UserDashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route 
+          path="/admin-dashboard" 
+          element={
+            <ProtectedRoute requiredRole="admin">
+              <AdminDashboard />
+            </ProtectedRoute>
+          } 
+        />
+        <Route path="/unauthorized" element={<Unauthorized />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      {!hideGlobalLayout && (
       <footer className="footer">
         <p>LMS Portal &copy; 2026 — DevOps Infrastructure Demo</p>
       </footer>
+      )}
+    </>
+  );
+}
+
+function App() {
+  return (
+    <Router>
+      <AppShell />
     </Router>
   );
 }
 
 export default App;
+

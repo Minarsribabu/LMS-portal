@@ -5,6 +5,13 @@ const axios = require('axios');
 const client = require('prom-client');
 const mongoose = require('mongoose');
 
+// Import models and routes
+const Course = require('../models/Course');
+const authRoutes = require('../routes/auth');
+const userRoutes = require('../routes/user');
+const adminRoutes = require('../routes/admin');
+const seedAdmin = require('../seedAdmin');
+
 const app = express();
 const PORT = process.env.PORT || 5000;
 const ML_SERVICE_URL = process.env.ML_SERVICE_URL || 'http://lms-ml:8000';
@@ -17,35 +24,10 @@ const defaultCourses = [
   { title: 'Monitoring & Observability', sessions: 6, level: 'Advanced' },
 ];
 
-const courseSchema = new mongoose.Schema(
-  {
-    title: { type: String, required: true, trim: true },
-    sessions: { type: Number, required: true, min: 1 },
-    level: {
-      type: String,
-      required: true,
-      enum: ['Beginner', 'Intermediate', 'Advanced'],
-    },
-  },
-  {
-    timestamps: true,
-    versionKey: false,
-  }
-);
-
-courseSchema.set('toJSON', {
-  transform: (_, ret) => {
-    ret.id = ret._id.toString();
-    delete ret._id;
-    return ret;
-  },
-});
-
-const Course = mongoose.model('Course', courseSchema);
-
 // ─── Middleware ───
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '8mb' }));
+app.use(express.urlencoded({ extended: true, limit: '8mb' }));
 
 // ─── Prometheus Metrics ───
 const register = new client.Registry();
@@ -84,6 +66,15 @@ app.use((req, res, next) => {
 });
 
 // ─── Routes ───
+
+// Authentication routes
+app.use('/api/auth', authRoutes);
+
+// User routes (protected)
+app.use('/api/user', userRoutes);
+
+// Admin routes (protected, admin only)
+app.use('/api/admin', adminRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -176,6 +167,8 @@ async function connectAndSeedMongo() {
     await Course.insertMany(defaultCourses);
     console.log('[Backend] Seeded default courses');
   }
+
+  await seedAdmin({ connect: false, disconnect: false, exitOnComplete: false });
 }
 
 // ─── Start Server ───

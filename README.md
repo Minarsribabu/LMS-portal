@@ -48,6 +48,34 @@ curl http://localhost/ml/health
 | MongoDB | lms-mongo | 27017 | (internal) |
 | Prometheus | lms-prometheus | 9090 | http://localhost:9090 |
 | Grafana | lms-grafana | 3001 | http://localhost:3001 |
+
+## Authentication & Authorization
+
+The platform now includes a complete **JWT-based authentication** and **Role-Based Access Control (RBAC)** system.
+
+### Features
+- ✅ User registration and login
+- ✅ JWT token-based authentication (1-hour expiry)
+- ✅ Role-based access control (user / admin)
+- ✅ Protected routes and API endpoints
+- ✅ Automatic admin seeding on first run
+- ✅ User profile management
+- ✅ Admin user management
+
+### Default Admin Credentials
+```
+Email:    admin@lms.com
+Password: admin123
+```
+
+### User Pages
+- `/login` — Login page
+- `/register` — Registration page
+- `/user-dashboard` — User dashboard (profile, ML predictor)
+- `/admin-dashboard` — Admin dashboard (user management, create admins)
+
+### API Documentation
+See [docs/AUTHENTICATION.md](docs/AUTHENTICATION.md) for complete API documentation and usage examples.
 | Nginx Proxy | lms-nginx | 80 | http://localhost |
 
 ## Inter-Service Communication
