@@ -64,7 +64,9 @@ jobs:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
+          port: 22
           script: |
+            echo "Connected to server"
             docker pull ${{ env.DOCKER_IMAGE }}:latest
             cd /opt/lms-portal
             docker compose up -d --no-deps lms-frontend
