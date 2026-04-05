@@ -73,5 +73,5 @@ jobs:
             echo "SSH Connected ✅"
             docker pull ${{ env.DOCKER_IMAGE }}:latest
             cd ~/LMS-portal || exit
-            docker compose pull lms-backend
-            docker compose up -d --no-deps lms-backend
+            docker-compose pull lms-backend
+            docker-compose up -d --no-deps lms-backend
