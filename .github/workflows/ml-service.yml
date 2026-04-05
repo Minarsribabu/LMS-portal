@@ -69,5 +69,5 @@ jobs:
           key: ${{ secrets.SERVER_SSH_KEY }}
           script: |
             docker pull ${{ env.DOCKER_IMAGE }}:latest
-            cd /opt/lms-portal
-            docker compose up -d --no-deps lms-ml
+            cd ~/lms-portal
+            docker-compose up -d --no-deps lms-ml

@@ -67,6 +67,6 @@ jobs:
           ssh -o StrictHostKeyChecking=no -i key.pem ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'EOF'
             echo "SSH Connected ✅"
             docker pull ${{ env.DOCKER_IMAGE }}:latest
-            cd /opt/lms-portal
-            docker compose up -d --no-deps lms-frontend
+            cd ~/lms-portal
+            docker-compose up -d --no-deps lms-frontend
           EOF
