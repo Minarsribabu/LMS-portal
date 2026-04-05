@@ -70,7 +70,8 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
           script: |
+            echo "SSH Connected ✅"
             docker pull ${{ env.DOCKER_IMAGE }}:latest
-            cd /LMS-portal || exit
+            cd ~/LMS-portal || exit
             docker compose pull lms-backend
             docker compose up -d --no-deps lms-backend
