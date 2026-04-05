@@ -71,6 +71,6 @@ jobs:
           key: ${{ secrets.SERVER_SSH_KEY }}
           script: |
             docker pull ${{ env.DOCKER_IMAGE }}:latest
-            cd /opt/lms-portal || exit
+            cd /LMS-portal || exit
             docker compose pull lms-backend
             docker compose up -d --no-deps lms-backend
