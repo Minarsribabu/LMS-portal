@@ -4,7 +4,6 @@ name: ML Service CI/CD
 on:
   push:
     branches: [main]
-    paths: ['ml-service/**']
   pull_request:
     branches: [main]
     paths: ['ml-service/**']
