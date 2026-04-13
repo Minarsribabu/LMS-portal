@@ -100,7 +100,7 @@ services:
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.retention.time=7d'
-      - '--web.external-url=https://13.62.184.149.nip.io/prometheus/'
+      - '--web.external-url=/prometheus/'
     depends_on:
       - lms-backend
       - lms-ml
@@ -120,9 +120,9 @@ services:
       - GF_SECURITY_ADMIN_PASSWORD=admin
 
       # ✅ CORRECT (you already fixed this 👍)
-      - GF_SERVER_ROOT_URL=https://13.62.184.149.nip.io/grafana/
+      - GF_SERVER_ROOT_URL=%(protocol)s://%(domain)s/grafana/
       - GF_SERVER_SERVE_FROM_SUB_PATH=true
-
+      - GF_SERVER_ENFORCE_DOMAIN=false
       # ✅ ADDED (prevents redirect issues in some cases)
       - GF_SERVER_DOMAIN=13.62.184.149.nip.io
 
