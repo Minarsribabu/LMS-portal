@@ -9,6 +9,8 @@ services:
     container_name: lms-nginx
     ports:
       - "80:80"
+    volumes:
+      - /etc/letsencrypt:/etc/letsencrypt:ro
     depends_on:
       - lms-frontend
       - lms-backend
@@ -68,6 +70,25 @@ services:
       - lms-network
     restart: unless-stopped
 
+  # ─── Prometheus Node Exporter (System Metrics) ───
+  lms-node-exporter:
+    image: prom/node-exporter:latest
+    container_name: lms-node-exporter
+    ports:
+      - "9100:9100"
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+      - '--collector.netdev.device-exclude=^(veth.*)'
+    networks:
+      - lms-network
+    restart: unless-stopped
+
   # ─── Prometheus ───
   lms-prometheus:
     image: prom/prometheus:latest
@@ -83,6 +104,7 @@ services:
     depends_on:
       - lms-backend
       - lms-ml
+      - lms-node-exporter
     networks:
       - lms-network
     restart: unless-stopped

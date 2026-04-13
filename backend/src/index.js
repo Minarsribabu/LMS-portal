@@ -48,20 +48,67 @@ const httpRequestsTotal = new client.Counter({
   registers: [register],
 });
 
+const httpClientErrorsTotal = new client.Counter({
+  name: 'http_client_errors_total',
+  help: 'Total number of HTTP 4xx client errors',
+  labelNames: ['method', 'route', 'status_code'],
+  registers: [register],
+});
+
+const httpServerErrorsTotal = new client.Counter({
+  name: 'http_server_errors_total',
+  help: 'Total number of HTTP 5xx server errors',
+  labelNames: ['method', 'route', 'status_code'],
+  registers: [register],
+});
+
+const httpActiveRequests = new client.Gauge({
+  name: 'http_active_requests',
+  help: 'Number of active HTTP requests',
+  labelNames: ['method', 'route'],
+  registers: [register],
+});
+
 // Metrics middleware
 app.use((req, res, next) => {
   const start = Date.now();
+  const route = req.route ? req.route.path : req.path;
+  
+  // Increment active requests
+  httpActiveRequests.inc({ method: req.method, route });
+  
   res.on('finish', () => {
     const duration = (Date.now() - start) / 1000;
-    const route = req.route ? req.route.path : req.path;
+    
+    // Record request duration
     httpRequestDuration.observe(
       { method: req.method, route, status_code: res.statusCode },
       duration
     );
+    
+    // Record total requests
     httpRequestsTotal.inc(
       { method: req.method, route, status_code: res.statusCode }
     );
+    
+    // Record client errors (4xx)
+    if (res.statusCode >= 400 && res.statusCode < 500) {
+      httpClientErrorsTotal.inc(
+        { method: req.method, route, status_code: res.statusCode }
+      );
+    }
+    
+    // Record server errors (5xx)
+    if (res.statusCode >= 500) {
+      httpServerErrorsTotal.inc(
+        { method: req.method, route, status_code: res.statusCode }
+      );
+    }
+    
+    // Decrement active requests
+    httpActiveRequests.dec({ method: req.method, route });
   });
+  
   next();
 });
 
