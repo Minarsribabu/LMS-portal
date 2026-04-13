@@ -100,6 +100,7 @@ services:
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.retention.time=7d'
+      - '--web.external-url=https://13.62.184.149.nip.io/prometheus/'
     depends_on:
       - lms-backend
       - lms-ml
