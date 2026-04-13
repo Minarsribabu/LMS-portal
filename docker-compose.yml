@@ -119,7 +119,7 @@ services:
       - GF_SECURITY_ADMIN_PASSWORD=admin
 
       # ✅ CORRECT (you already fixed this 👍)
-      - GF_SERVER_ROOT_URL=https://13.62.184.149.nip.io/grafana
+      - GF_SERVER_ROOT_URL=https://13.62.184.149.nip.io/grafana/
       - GF_SERVER_SERVE_FROM_SUB_PATH=true
 
       # ✅ ADDED (prevents redirect issues in some cases)
