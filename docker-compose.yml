@@ -1,6 +1,3 @@
-# LMS Portal — Docker Compose
-# Spin up the full stack: docker compose up --build
-
 services:
 
   # ─── Nginx Reverse Proxy (Entry Point) ───
@@ -17,6 +14,7 @@ services:
       - lms-backend
       - lms-ml
       - lms-grafana
+      - lms-prometheus   # ✅ ADDED (ensure nginx waits for prometheus also)
     networks:
       - lms-network
     restart: unless-stopped
@@ -71,7 +69,7 @@ services:
       - lms-network
     restart: unless-stopped
 
-  # ─── Prometheus Node Exporter (System Metrics) ───
+  # ─── Prometheus Node Exporter ───
   lms-node-exporter:
     image: prom/node-exporter:latest
     container_name: lms-node-exporter
@@ -95,7 +93,7 @@ services:
     image: prom/prometheus:latest
     container_name: lms-prometheus
     ports:
-      - "9090:9090"
+      - "9090:9090"   # ⚠️ OPTIONAL: remove later for security (nginx will handle access)
     volumes:
       - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
       - prometheus-data:/prometheus
@@ -115,12 +113,18 @@ services:
     image: grafana/grafana:latest
     container_name: lms-grafana
     ports:
-      - "3001:3000"
+      - "3001:3000"   # ⚠️ OPTIONAL: remove later (access via nginx only)
     environment:
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=admin
-      - GF_SERVER_ROOT_URL=http://localhost:3001
-      - GF_SERVER_SERVE_FROM_SUB_PATH=false
+
+      # ✅ CORRECT (you already fixed this 👍)
+      - GF_SERVER_ROOT_URL=https://13.62.184.149.nip.io/grafana
+      - GF_SERVER_SERVE_FROM_SUB_PATH=true
+
+      # ✅ ADDED (prevents redirect issues in some cases)
+      - GF_SERVER_DOMAIN=13.62.184.149.nip.io
+
     volumes:
       - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
       - grafana-data:/var/lib/grafana
