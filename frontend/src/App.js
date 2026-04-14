@@ -227,7 +227,7 @@ function AppShell() {
       </Routes>
       {!hideGlobalLayout && (
       <footer className="footer">
-        <p>LMS Portal &copy; 2026 — DevOps Infrastructure Demo</p>
+        <p>Dakh Edu LMS Portal &copy; 2026</p>
       </footer>
       )}
     </>

@@ -130,6 +130,15 @@ router.post('/courses/:courseId/enroll', verifyToken, authorizeRoles('admin'), a
       return res.status(404).json({ error: 'User not found' });
     }
 
+    const userIdString = user._id.toString();
+    const pendingRequest = (course.enrollmentRequests || []).find(
+      (entry) => entry.user.toString() === userIdString && entry.status === 'pending'
+    );
+
+    if (!pendingRequest) {
+      return res.status(400).json({ error: 'No pending enrollment request found for this user and course' });
+    }
+
     await enrollUserInCourse({ course, user });
 
     const updatedCourse = await Course.findById(courseId).populate('enrolledUsers', 'name email role');

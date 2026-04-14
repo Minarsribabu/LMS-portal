@@ -3,7 +3,6 @@ const User = require('../models/User');
 const Course = require('../models/Course');
 const Progress = require('../models/Progress');
 const { verifyToken, authorizeRoles } = require('../middleware/authMiddleware');
-const { enrollUserInCourse } = require('../services/enrollmentService');
 
 const router = express.Router();
 
@@ -108,29 +107,8 @@ router.post('/courses/:courseId/request-enrollment', verifyToken, async (req, re
 // POST /api/user/courses/:courseId/enroll - Enroll in a course and create an enrollment record
 router.post('/courses/:courseId/enroll', verifyToken, authorizeRoles('user'), async (req, res) => {
   try {
-    const { courseId } = req.params;
-    const userId = req.user.id;
-
-    const course = await Course.findById(courseId);
-    if (!course) {
-      return res.status(404).json({ error: 'Course not found' });
-    }
-
-    const isEnrolled = course.enrolledUsers.some((entry) => entry.toString() === userId);
-    if (isEnrolled) {
-      return res.status(200).json({ message: 'You are already enrolled in this course', enrollmentStatus: 'approved' });
-    }
-
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-
-    await enrollUserInCourse({ course, user });
-
-    return res.status(200).json({
-      message: 'Course enrollment confirmed',
-      enrollmentStatus: 'approved',
+    return res.status(403).json({
+      error: 'Direct enrollment is disabled. Please request enrollment and wait for admin approval.',
     });
   } catch (error) {
     console.error('Enroll course error:', error);

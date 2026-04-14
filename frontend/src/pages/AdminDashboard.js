@@ -23,14 +23,12 @@ function AdminDashboard() {
     level: 'Beginner',
     topics: [{ ...emptyTopic }],
   });
-  const [enrollForm, setEnrollForm] = useState({ courseId: '', userId: '' });
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [pageLoading, setPageLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const navigate = useNavigate();
 
-  const userOptions = useMemo(() => users.filter((item) => item.role === 'user'), [users]);
   const pendingRequestsByCourse = useMemo(
     () => courses
       .map((course) => ({
@@ -216,26 +214,6 @@ function AdminDashboard() {
     }
   };
 
-  const handleEnrollUser = async (e) => {
-    e.preventDefault();
-    clearStatus();
-    setActionLoading(true);
-
-    try {
-      await axiosService.post(`/admin/courses/${enrollForm.courseId}/enroll`, {
-        userId: enrollForm.userId,
-      });
-
-      setMessage('User enrolled into course successfully');
-      setEnrollForm({ courseId: '', userId: '' });
-      await Promise.all([refreshCourses(), refreshUsers()]);
-    } catch (err) {
-      setError(err.response?.data?.error || 'Failed to enroll user');
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
   const handleApproveRequest = async (courseId, userId) => {
     clearStatus();
     setActionLoading(true);
@@ -394,49 +372,6 @@ function AdminDashboard() {
                 </div>
               </article>
 
-              <article className="card">
-                <div className="card-header">
-                  <div>
-                    <h2>Enroll Users</h2>
-                    <p className="section-note">Assign a selected user to a selected course.</p>
-                  </div>
-                </div>
-                <form onSubmit={handleEnrollUser} className="stack-form two-col-form">
-                  <div className="form-group">
-                    <label>Course</label>
-                    <select
-                      value={enrollForm.courseId}
-                      onChange={(e) => setEnrollForm({ ...enrollForm, courseId: e.target.value })}
-                      required
-                    >
-                      <option value="">Select a course</option>
-                      {courses.map((course) => (
-                        <option key={course.id} value={course.id}>
-                          {course.title}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="form-group">
-                    <label>User</label>
-                    <select
-                      value={enrollForm.userId}
-                      onChange={(e) => setEnrollForm({ ...enrollForm, userId: e.target.value })}
-                      required
-                    >
-                      <option value="">Select a user</option>
-                      {userOptions.map((userItem) => (
-                        <option key={userItem.id} value={userItem.id}>
-                          {userItem.name} ({userItem.email})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <button type="submit" disabled={actionLoading || !courses.length || !userOptions.length} className="btn-primary">
-                    {actionLoading ? 'Enrolling...' : 'Enroll User'}
-                  </button>
-                </form>
-              </article>
             </section>
           )}
 

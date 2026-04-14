@@ -86,10 +86,13 @@ function CourseDetailPage() {
   }, [course]);
 
   const topics = useMemo(() => course?.topics || [], [course]);
-  const canEnroll = isAuthenticated && user?.role === 'user' && enrollmentStatus === 'none';
+  const canRequestEnrollment = isAuthenticated
+    && user?.role === 'user'
+    && (enrollmentStatus === 'none' || enrollmentStatus === 'rejected');
   const alreadyEnrolled = enrollmentStatus === 'approved';
+  const canViewFullContent = user?.role === 'admin' || alreadyEnrolled;
 
-  const handleEnroll = async () => {
+  const handleRequestEnrollment = async () => {
     if (!course || enrollmentLoading) {
       return;
     }
@@ -99,12 +102,12 @@ function CourseDetailPage() {
     setSuccess('');
 
     try {
-      await axiosService.post(`/user/courses/${course.id}/enroll`);
-      setEnrollmentStatus('approved');
-      setSuccess('Enrollment completed successfully.');
+      const response = await axiosService.post(`/user/courses/${course.id}/request-enrollment`);
+      setEnrollmentStatus(response.data?.enrollmentStatus || 'pending');
+      setSuccess(response.data?.message || 'Enrollment request submitted successfully.');
       navigate(`/course/${course.id}`, { replace: true });
     } catch (enrollError) {
-      setError(enrollError.response?.data?.error || 'Enrollment failed');
+      setError(enrollError.response?.data?.error || 'Failed to submit enrollment request');
     } finally {
       setEnrollmentLoading(false);
     }
@@ -142,14 +145,14 @@ function CourseDetailPage() {
             </div>
 
             <div className="course-detail-action-row">
-              {canEnroll && (
-                <button type="button" className="btn btn-primary" onClick={handleEnroll} disabled={enrollmentLoading}>
-                  {enrollmentLoading ? 'Enrolling...' : 'Enroll'}
+              {canRequestEnrollment && (
+                <button type="button" className="btn btn-primary" onClick={handleRequestEnrollment} disabled={enrollmentLoading}>
+                  {enrollmentLoading ? 'Requesting...' : 'Request Enrollment'}
                 </button>
               )}
               {alreadyEnrolled && <span className="enrollment-chip enrolled">Enrolled</span>}
               {enrollmentStatus === 'pending' && <span className="enrollment-chip pending">Pending approval</span>}
-              {!isAuthenticated && <Link to="/login" className="btn btn-outline">Login to enroll</Link>}
+              {!isAuthenticated && <Link to="/login" className="btn btn-outline">Login to request enrollment</Link>}
             </div>
 
             {success && <div className="success-message course-detail-message">{success}</div>}
@@ -158,7 +161,11 @@ function CourseDetailPage() {
             <section className="course-topics-section">
               <div className="section-heading">
                 <h2>Topics</h2>
-                <p>Expand a topic to watch the video and review the transcript.</p>
+                <p>
+                  {canViewFullContent
+                    ? 'Expand a topic to watch the video and review the transcript.'
+                    : 'Overview only. Request enrollment and wait for admin approval to unlock full course content.'}
+                </p>
               </div>
 
               {!topics.length ? (
@@ -182,7 +189,7 @@ function CourseDetailPage() {
                           <span aria-hidden="true">{isOpen ? '−' : '+'}</span>
                         </button>
 
-                        {isOpen && (
+                        {isOpen && canViewFullContent && (
                           <div className="topic-accordion-panel">
                             <div className="topic-media">
                               {topicUrl ? (
@@ -211,6 +218,14 @@ function CourseDetailPage() {
                                 {topic.transcript ? topic.transcript : 'No transcript available.'}
                               </div>
                             </details>
+                          </div>
+                        )}
+
+                        {isOpen && !canViewFullContent && (
+                          <div className="topic-accordion-panel">
+                            <div className="topic-video-placeholder">
+                              Enroll approval required to view video and transcript for this topic.
+                            </div>
                           </div>
                         )}
                       </article>
