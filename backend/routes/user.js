@@ -1,6 +1,7 @@
 const express = require('express');
 const User = require('../models/User');
 const Course = require('../models/Course');
+const Progress = require('../models/Progress');
 const { verifyToken } = require('../middleware/authMiddleware');
 
 const router = express.Router();
@@ -11,7 +12,7 @@ const buildUserProfile = async (userId) => {
     return null;
   }
 
-  const enrolledCourses = await Course.find({ enrolledUsers: userId }).select('title sessions level createdAt enrolledUsers');
+  const enrolledCourses = await Course.find({ enrolledUsers: userId }).select('title description thumbnail sessions level topics createdAt enrolledUsers');
 
   const baseUser = user.toJSON();
 
@@ -99,6 +100,86 @@ router.post('/courses/:courseId/request-enrollment', verifyToken, async (req, re
     return res.status(200).json({ message: 'Enrollment request submitted', enrollmentStatus: 'pending' });
   } catch (error) {
     console.error('Request enrollment error:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// POST /api/user/progress - Mark topic as completed for a user
+router.post('/progress', verifyToken, async (req, res) => {
+  try {
+    const { courseId, topicId, status } = req.body;
+    const userId = req.user.id;
+
+    if (!courseId || !topicId) {
+      return res.status(400).json({ error: 'courseId and topicId are required' });
+    }
+
+    if (status && status !== 'completed') {
+      return res.status(400).json({ error: 'Only completed status is supported' });
+    }
+
+    const course = await Course.findById(courseId);
+    if (!course) {
+      return res.status(404).json({ error: 'Course not found' });
+    }
+
+    const isEnrolled = course.enrolledUsers.some((entry) => entry.toString() === userId);
+    if (!isEnrolled) {
+      return res.status(403).json({ error: 'You are not enrolled in this course' });
+    }
+
+    const topicExists = (course.topics || []).some((topic) => topic._id.toString() === String(topicId));
+    if (!topicExists) {
+      return res.status(404).json({ error: 'Topic not found in this course' });
+    }
+
+    const progress = await Progress.findOneAndUpdate(
+      { userId, courseId, topicId },
+      { $set: { status: 'completed', completedAt: new Date() } },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+
+    return res.status(201).json({ message: 'Topic marked as completed', progress: progress.toJSON() });
+  } catch (error) {
+    console.error('Update progress error:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// GET /api/user/progress/:courseId - Get completed topics and percentage for current user
+router.get('/progress/:courseId', verifyToken, async (req, res) => {
+  try {
+    const { courseId } = req.params;
+    const userId = req.user.id;
+
+    const course = await Course.findById(courseId).select('title topics enrolledUsers');
+    if (!course) {
+      return res.status(404).json({ error: 'Course not found' });
+    }
+
+    const isEnrolled = course.enrolledUsers.some((entry) => entry.toString() === userId);
+    if (!isEnrolled) {
+      return res.status(403).json({ error: 'You are not enrolled in this course' });
+    }
+
+    const progressDocs = await Progress.find({ userId, courseId, status: 'completed' });
+    const completedTopicIds = progressDocs.map((item) => item.topicId.toString());
+
+    const totalTopics = Array.isArray(course.topics) ? course.topics.length : 0;
+    const completedTopics = totalTopics
+      ? course.topics.filter((topic) => completedTopicIds.includes(topic._id.toString())).length
+      : 0;
+    const progressPercentage = totalTopics ? Math.round((completedTopics / totalTopics) * 100) : 0;
+
+    return res.status(200).json({
+      courseId,
+      completedTopicIds,
+      completedTopics,
+      totalTopics,
+      progressPercentage,
+    });
+  } catch (error) {
+    console.error('Get progress error:', error);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });

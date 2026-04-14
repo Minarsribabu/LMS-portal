@@ -7,7 +7,7 @@ import UserSidebar from '../components/UserSidebar';
 import Header from '../components/Header';
 import '../styles/Dashboard.css';
 
-function UserHomeSection({ user, loading, predictInput, setPredictInput, handlePredict, prediction }) {
+function UserHomeSection({ user, loading, predictInput, setPredictInput, handlePredict, prediction, predictError }) {
   return (
     <section className="section-stack">
       <article className="card">
@@ -36,6 +36,8 @@ function UserHomeSection({ user, loading, predictInput, setPredictInput, handleP
               className="predict-input"
               type="number"
               step="0.1"
+              min="0"
+              placeholder="10-25 hours"
               value={predictInput.hours_watched}
               onChange={(e) => setPredictInput({ ...predictInput, hours_watched: e.target.value })}
               required
@@ -46,6 +48,8 @@ function UserHomeSection({ user, loading, predictInput, setPredictInput, handleP
             <input
               className="predict-input"
               type="number"
+              min="0"
+              placeholder="5-20"
               value={predictInput.quizzes_passed}
               onChange={(e) => setPredictInput({ ...predictInput, quizzes_passed: e.target.value })}
               required
@@ -56,6 +60,8 @@ function UserHomeSection({ user, loading, predictInput, setPredictInput, handleP
             <input
               className="predict-input"
               type="number"
+              min="0"
+              placeholder="3-15"
               value={predictInput.assignments_done}
               onChange={(e) => setPredictInput({ ...predictInput, assignments_done: e.target.value })}
               required
@@ -65,6 +71,8 @@ function UserHomeSection({ user, loading, predictInput, setPredictInput, handleP
             {loading ? 'Predicting...' : 'Get Prediction'}
           </button>
         </form>
+
+        {predictError && <div className="error-message">{predictError}</div>}
 
         {prediction && (
           <div className="prediction-result">
@@ -92,7 +100,7 @@ function UserHomeSection({ user, loading, predictInput, setPredictInput, handleP
   );
 }
 
-function MyCoursesSection({ user }) {
+function MyCoursesSection({ user, progressByCourse, onMarkTopicComplete, actionLoading }) {
   return (
     <section className="card enrolled-courses-card">
       <div className="card-header">
@@ -104,7 +112,13 @@ function MyCoursesSection({ user }) {
       {user.enrolledCourses?.length ? (
         <div className="course-grid user-course-grid">
           {user.enrolledCourses.map((course) => (
-            <CourseCard key={course.id} course={course} />
+            <CourseCard
+              key={course.id}
+              course={course}
+              progressData={progressByCourse[course.id]}
+              onMarkTopicComplete={onMarkTopicComplete}
+              actionLoading={actionLoading}
+            />
           ))}
         </div>
       ) : (
@@ -162,6 +176,8 @@ function UserDashboard() {
   const [profileLoading, setProfileLoading] = useState(true);
   const [predictInput, setPredictInput] = useState({ hours_watched: '', quizzes_passed: '', assignments_done: '' });
   const [prediction, setPrediction] = useState(null);
+  const [predictError, setPredictError] = useState('');
+  const [progressByCourse, setProgressByCourse] = useState({});
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -194,6 +210,30 @@ function UserDashboard() {
   useEffect(() => {
     fetchProfile();
   }, []);
+
+  useEffect(() => {
+    const fetchProgress = async () => {
+      if (!user?.enrolledCourses?.length) {
+        setProgressByCourse({});
+        return;
+      }
+
+      const entries = await Promise.all(
+        user.enrolledCourses.map(async (course) => {
+          try {
+            const response = await axiosService.get(`/user/progress/${course.id}`);
+            return [course.id, response.data];
+          } catch (err) {
+            return [course.id, { completedTopicIds: [], progressPercentage: 0 }];
+          }
+        })
+      );
+
+      setProgressByCourse(Object.fromEntries(entries));
+    };
+
+    fetchProgress();
+  }, [user]);
 
   const handleUpdateProfile = async (e) => {
     e.preventDefault();
@@ -240,17 +280,51 @@ function UserDashboard() {
     e.preventDefault();
     setLoading(true);
     setError('');
+    setPredictError('');
     setPrediction(null);
+
+    const hoursWatched = Number(predictInput.hours_watched);
+    const quizzesPassed = Number(predictInput.quizzes_passed);
+    const assignmentsDone = Number(predictInput.assignments_done);
+
+    if ([hoursWatched, quizzesPassed, assignmentsDone].some((value) => Number.isNaN(value) || value < 0)) {
+      setPredictError('Please enter valid non-negative values for all predictor fields.');
+      setLoading(false);
+      return;
+    }
+
+    if (hoursWatched > 300 || quizzesPassed > 200 || assignmentsDone > 200) {
+      setPredictError('Values look out of expected range. Please provide realistic learning metrics.');
+      setLoading(false);
+      return;
+    }
 
     try {
       const response = await axiosService.post('/predict', {
-        hours_watched: parseFloat(predictInput.hours_watched),
-        quizzes_passed: parseInt(predictInput.quizzes_passed),
-        assignments_done: parseInt(predictInput.assignments_done),
+        hours_watched: hoursWatched,
+        quizzes_passed: Math.trunc(quizzesPassed),
+        assignments_done: Math.trunc(assignmentsDone),
       });
       setPrediction(response.data);
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to make prediction.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleMarkTopicComplete = async (courseId, topicId) => {
+    setLoading(true);
+    setError('');
+    setMessage('');
+
+    try {
+      await axiosService.post('/user/progress', { courseId, topicId, status: 'completed' });
+      const response = await axiosService.get(`/user/progress/${courseId}`);
+      setProgressByCourse((prev) => ({ ...prev, [courseId]: response.data }));
+      setMessage('Topic marked as completed.');
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to update progress.');
     } finally {
       setLoading(false);
     }
@@ -287,10 +361,21 @@ function UserDashboard() {
                   setPredictInput={setPredictInput}
                   handlePredict={handlePredict}
                   prediction={prediction}
+                  predictError={predictError}
                 />
               }
             />
-            <Route path="my-courses" element={<MyCoursesSection user={user} />} />
+            <Route
+              path="my-courses"
+              element={
+                <MyCoursesSection
+                  user={user}
+                  progressByCourse={progressByCourse}
+                  onMarkTopicComplete={handleMarkTopicComplete}
+                  actionLoading={loading}
+                />
+              }
+            />
             <Route
               path="profile"
               element={

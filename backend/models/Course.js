@@ -1,14 +1,30 @@
 const mongoose = require('mongoose');
 
+const topicSchema = new mongoose.Schema(
+  {
+    title: { type: String, required: true, trim: true },
+    videoUrl: { type: String, default: '', trim: true },
+    videoPath: { type: String, default: '', trim: true },
+    transcript: { type: String, default: '', trim: true },
+    order: { type: Number, default: 0 },
+  },
+  {
+    timestamps: false,
+  }
+);
+
 const courseSchema = new mongoose.Schema(
   {
     title: { type: String, required: true, trim: true },
-    sessions: { type: Number, required: true, min: 1 },
+    description: { type: String, default: '', trim: true },
+    thumbnail: { type: String, default: '', trim: true },
+    sessions: { type: Number, min: 1, default: 1 },
     level: {
       type: String,
-      required: true,
+      default: 'Beginner',
       enum: ['Beginner', 'Intermediate', 'Advanced'],
     },
+    topics: [topicSchema],
     enrolledUsers: [
       {
         type: mongoose.Schema.Types.ObjectId,
@@ -47,6 +63,9 @@ courseSchema.set('toJSON', {
     ret.enrolledCount = Array.isArray(ret.enrolledUsers) ? ret.enrolledUsers.length : 0;
     if (!Array.isArray(ret.enrollmentRequests)) {
       ret.enrollmentRequests = [];
+    }
+    if (!Array.isArray(ret.topics)) {
+      ret.topics = [];
     }
     return ret;
   },

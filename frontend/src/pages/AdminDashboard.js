@@ -5,6 +5,8 @@ import Sidebar from '../components/Sidebar';
 import Header from '../components/Header';
 import '../styles/Dashboard.css';
 
+const emptyTopic = { title: '', videoUrl: '', videoPath: '', transcript: '' };
+
 function AdminDashboard() {
   const [user, setUser] = useState(null);
   const [users, setUsers] = useState([]);
@@ -12,13 +14,23 @@ function AdminDashboard() {
   const [stats, setStats] = useState(null);
   const [activeTab, setActiveTab] = useState('overview');
   const [createAdminForm, setCreateAdminForm] = useState({ name: '', email: '', password: '' });
-  const [createCourseForm, setCreateCourseForm] = useState({ title: '', sessions: '', level: 'Beginner' });
+  const [courseForm, setCourseForm] = useState({
+    id: '',
+    title: '',
+    description: '',
+    thumbnail: '',
+    sessions: 1,
+    level: 'Beginner',
+    topics: [{ ...emptyTopic }],
+  });
   const [enrollForm, setEnrollForm] = useState({ courseId: '', userId: '' });
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [pageLoading, setPageLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const navigate = useNavigate();
+
+  const monitoringToken = localStorage.getItem('token') || '';
 
   const userOptions = useMemo(() => users.filter((item) => item.role === 'user'), [users]);
   const pendingRequestsByCourse = useMemo(
@@ -30,6 +42,17 @@ function AdminDashboard() {
       .filter((course) => course.pendingRequests.length > 0),
     [courses]
   );
+
+  const overviewCards = useMemo(() => {
+    const totalCourses = Number(stats?.totalCourses ?? courses.length ?? 0);
+
+    return [
+      { label: 'Total Users', value: stats?.totalUsers ?? 0, to: '/admin-dashboard/details/users' },
+      { label: 'Admin Users', value: stats?.totalAdmins ?? 0, to: '/admin-dashboard/details/admin-users' },
+      { label: 'Regular Users', value: stats?.totalRegularUsers ?? 0, to: '/admin-dashboard/details/regular-users' },
+      { label: 'Total Courses', value: totalCourses, to: '/admin-dashboard/details/courses' },
+    ];
+  }, [stats, courses.length]);
 
   useEffect(() => {
     if (!message && !error) {
@@ -103,23 +126,71 @@ function AdminDashboard() {
     setMessage('');
   };
 
-  const handleCreateCourse = async (e) => {
+  const resetCourseForm = () => {
+    setCourseForm({
+      id: '',
+      title: '',
+      description: '',
+      thumbnail: '',
+      sessions: 1,
+      level: 'Beginner',
+      topics: [{ ...emptyTopic }],
+    });
+  };
+
+  const handleTopicChange = (index, key, value) => {
+    setCourseForm((prev) => {
+      const nextTopics = [...prev.topics];
+      nextTopics[index] = { ...nextTopics[index], [key]: value };
+      return { ...prev, topics: nextTopics };
+    });
+  };
+
+  const handleAddTopic = () => {
+    setCourseForm((prev) => ({ ...prev, topics: [...prev.topics, { ...emptyTopic }] }));
+  };
+
+  const handleRemoveTopic = (index) => {
+    setCourseForm((prev) => {
+      const nextTopics = prev.topics.filter((_, topicIndex) => topicIndex !== index);
+      return { ...prev, topics: nextTopics.length ? nextTopics : [{ ...emptyTopic }] };
+    });
+  };
+
+  const handleCreateOrUpdateCourse = async (e) => {
     e.preventDefault();
     clearStatus();
     setActionLoading(true);
 
     try {
-      await axiosService.post('/admin/courses', {
-        title: createCourseForm.title,
-        sessions: Number(createCourseForm.sessions),
-        level: createCourseForm.level,
-      });
+      const payload = {
+        title: courseForm.title,
+        description: courseForm.description,
+        thumbnail: courseForm.thumbnail,
+        sessions: Number(courseForm.sessions) || 1,
+        level: courseForm.level,
+        topics: courseForm.topics
+          .filter((topic) => topic.title.trim())
+          .map((topic) => ({
+            title: topic.title.trim(),
+            videoUrl: topic.videoUrl.trim(),
+            videoPath: topic.videoPath.trim(),
+            transcript: topic.transcript.trim(),
+          })),
+      };
 
-      setMessage('Course created successfully');
-      setCreateCourseForm({ title: '', sessions: '', level: 'Beginner' });
-      await refreshCourses();
+      if (courseForm.id) {
+        await axiosService.put(`/admin/course/${courseForm.id}`, payload);
+        setMessage('Course updated successfully');
+      } else {
+        await axiosService.post('/admin/course', payload);
+        setMessage('Course created successfully');
+      }
+
+      resetCourseForm();
+      await Promise.all([refreshCourses(), refreshStats()]);
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to create course');
+      setError(err.response?.data?.error || 'Failed to save course');
     } finally {
       setActionLoading(false);
     }
@@ -159,8 +230,7 @@ function AdminDashboard() {
 
       setMessage('User enrolled into course successfully');
       setEnrollForm({ courseId: '', userId: '' });
-      await refreshCourses();
-      await refreshUsers();
+      await Promise.all([refreshCourses(), refreshUsers()]);
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to enroll user');
     } finally {
@@ -194,8 +264,7 @@ function AdminDashboard() {
     try {
       await axiosService.delete(`/admin/users/${userId}`);
       setMessage('User deleted successfully');
-      await refreshUsers();
-      await refreshStats();
+      await Promise.all([refreshUsers(), refreshStats()]);
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to delete user');
     } finally {
@@ -212,15 +281,35 @@ function AdminDashboard() {
     setActionLoading(true);
 
     try {
-      await axiosService.delete(`/admin/courses/${courseId}`);
+      await axiosService.delete(`/admin/course/${courseId}`);
       setMessage('Course removed successfully');
-      await refreshCourses();
-      await refreshStats();
+      await Promise.all([refreshCourses(), refreshStats()]);
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to remove course');
     } finally {
       setActionLoading(false);
     }
+  };
+
+  const handleEditCourse = (course) => {
+    setActiveTab('courses');
+    setCourseForm({
+      id: course.id,
+      title: course.title || '',
+      description: course.description || '',
+      thumbnail: course.thumbnail || '',
+      sessions: course.sessions || 1,
+      level: course.level || 'Beginner',
+      topics: Array.isArray(course.topics) && course.topics.length
+        ? course.topics.map((topic) => ({
+            title: topic.title || '',
+            videoUrl: topic.videoUrl || '',
+            videoPath: topic.videoPath || '',
+            transcript: topic.transcript || '',
+          }))
+        : [{ ...emptyTopic }],
+    });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleLogout = () => {
@@ -241,27 +330,42 @@ function AdminDashboard() {
         <Header userName={user.name} role={user.role} onLogout={handleLogout} />
 
         <main className="admin-content-area">
-          {message && <div className="success-message success-inline">✓ {message}</div>}
-          {error && <div className="error-message error-inline">⚠ {error}</div>}
+          {message && <div className="success-message success-inline">{message}</div>}
+          {error && <div className="error-message error-inline">{error}</div>}
+
+          <section className="admin-monitoring-bar" aria-label="Monitoring">
+            <span className="monitoring-title">Monitoring</span>
+            <a
+              className="monitoring-link"
+              href={`/api/admin/monitoring/grafana?token=${encodeURIComponent(monitoringToken)}`}
+              target="_blank"
+              rel="noreferrer"
+            >
+              Grafana
+            </a>
+            <a
+              className="monitoring-link"
+              href={`/api/admin/monitoring/prometheus?token=${encodeURIComponent(monitoringToken)}`}
+              target="_blank"
+              rel="noreferrer"
+            >
+              Prometheus
+            </a>
+          </section>
 
           {activeTab === 'overview' && stats && (
             <section className="stats-container">
-              <div className="stat-card">
-                <h3>Total Users</h3>
-                <p className="stat-value">{stats.totalUsers}</p>
-              </div>
-              <div className="stat-card">
-                <h3>Admins</h3>
-                <p className="stat-value">{stats.totalAdmins}</p>
-              </div>
-              <div className="stat-card">
-                <h3>Regular Users</h3>
-                <p className="stat-value">{stats.totalRegularUsers}</p>
-              </div>
-              <div className="stat-card">
-                <h3>Courses</h3>
-                <p className="stat-value">{courses.length}</p>
-              </div>
+              {overviewCards.map((card) => (
+                <button
+                  type="button"
+                  key={card.label}
+                  className="stat-card stat-card-clickable"
+                  onClick={() => navigate(card.to)}
+                >
+                  <h3>{card.label}</h3>
+                  <p className="stat-value">{card.value}</p>
+                </button>
+              ))}
             </section>
           )}
 
@@ -363,46 +467,133 @@ function AdminDashboard() {
               <article className="card">
                 <div className="card-header">
                   <div>
-                    <h2>Course Management</h2>
-                    <p className="section-note">Add new courses and maintain the current catalog.</p>
+                    <h2>{courseForm.id ? 'Edit Course' : 'Create Course'}</h2>
+                    <p className="section-note">Manage title, media, and topics/modules for each course.</p>
                   </div>
                 </div>
-                <form onSubmit={handleCreateCourse} className="stack-form two-col-form">
+                <form onSubmit={handleCreateOrUpdateCourse} className="stack-form">
+                  <div className="two-col-form">
+                    <div className="form-group">
+                      <label>Course Title</label>
+                      <input
+                        type="text"
+                        value={courseForm.title}
+                        onChange={(e) => setCourseForm({ ...courseForm, title: e.target.value })}
+                        placeholder="e.g. Kubernetes Fundamentals"
+                        required
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>Thumbnail URL (Optional)</label>
+                      <input
+                        type="url"
+                        value={courseForm.thumbnail}
+                        onChange={(e) => setCourseForm({ ...courseForm, thumbnail: e.target.value })}
+                        placeholder="https://..."
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>Sessions</label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={courseForm.sessions}
+                        onChange={(e) => setCourseForm({ ...courseForm, sessions: e.target.value })}
+                        required
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>Level</label>
+                      <select
+                        value={courseForm.level}
+                        onChange={(e) => setCourseForm({ ...courseForm, level: e.target.value })}
+                      >
+                        <option value="Beginner">Beginner</option>
+                        <option value="Intermediate">Intermediate</option>
+                        <option value="Advanced">Advanced</option>
+                      </select>
+                    </div>
+                  </div>
+
                   <div className="form-group">
-                    <label>Course Title</label>
-                    <input
-                      type="text"
-                      value={createCourseForm.title}
-                      onChange={(e) => setCreateCourseForm({ ...createCourseForm, title: e.target.value })}
-                      placeholder="e.g. Kubernetes Fundamentals"
-                      required
+                    <label>Description</label>
+                    <textarea
+                      className="course-textarea"
+                      value={courseForm.description}
+                      onChange={(e) => setCourseForm({ ...courseForm, description: e.target.value })}
+                      placeholder="Course summary"
+                      rows="3"
                     />
                   </div>
-                  <div className="form-group">
-                    <label>Sessions</label>
-                    <input
-                      type="number"
-                      min="1"
-                      value={createCourseForm.sessions}
-                      onChange={(e) => setCreateCourseForm({ ...createCourseForm, sessions: e.target.value })}
-                      placeholder="12"
-                      required
-                    />
+
+                  <div className="topic-section">
+                    <div className="topic-section-head">
+                      <h3>Topics / Modules</h3>
+                      <button type="button" className="btn-secondary" onClick={handleAddTopic}>Add Topic</button>
+                    </div>
+
+                    {courseForm.topics.map((topic, index) => (
+                      <div key={`topic-${index}`} className="topic-card">
+                        <div className="topic-card-head">
+                          <strong>Topic {index + 1}</strong>
+                          <button type="button" className="btn-delete btn-delete-inline" onClick={() => handleRemoveTopic(index)}>
+                            Remove
+                          </button>
+                        </div>
+                        <div className="two-col-form">
+                          <div className="form-group">
+                            <label>Topic Title</label>
+                            <input
+                              type="text"
+                              value={topic.title}
+                              onChange={(e) => handleTopicChange(index, 'title', e.target.value)}
+                              placeholder="Topic name"
+                              required={index === 0}
+                            />
+                          </div>
+                          <div className="form-group">
+                            <label>Video URL</label>
+                            <input
+                              type="url"
+                              value={topic.videoUrl}
+                              onChange={(e) => handleTopicChange(index, 'videoUrl', e.target.value)}
+                              placeholder="https://..."
+                            />
+                          </div>
+                          <div className="form-group">
+                            <label>Video File Path</label>
+                            <input
+                              type="text"
+                              value={topic.videoPath}
+                              onChange={(e) => handleTopicChange(index, 'videoPath', e.target.value)}
+                              placeholder="/uploads/video.mp4"
+                            />
+                          </div>
+                        </div>
+                        <div className="form-group">
+                          <label>Transcript</label>
+                          <textarea
+                            className="course-textarea"
+                            value={topic.transcript}
+                            onChange={(e) => handleTopicChange(index, 'transcript', e.target.value)}
+                            rows="3"
+                            placeholder="Topic transcript"
+                          />
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                  <div className="form-group">
-                    <label>Level</label>
-                    <select
-                      value={createCourseForm.level}
-                      onChange={(e) => setCreateCourseForm({ ...createCourseForm, level: e.target.value })}
-                    >
-                      <option value="Beginner">Beginner</option>
-                      <option value="Intermediate">Intermediate</option>
-                      <option value="Advanced">Advanced</option>
-                    </select>
+
+                  <div className="form-actions-inline">
+                    <button type="submit" disabled={actionLoading} className="btn-primary">
+                      {actionLoading ? 'Saving...' : courseForm.id ? 'Update Course' : 'Create Course'}
+                    </button>
+                    {courseForm.id && (
+                      <button type="button" className="btn-secondary" onClick={resetCourseForm}>
+                        Cancel Edit
+                      </button>
+                    )}
                   </div>
-                  <button type="submit" disabled={actionLoading} className="btn-primary">
-                    {actionLoading ? 'Saving...' : 'Add Course'}
-                  </button>
                 </form>
               </article>
 
@@ -415,18 +606,29 @@ function AdminDashboard() {
                       <div className="course-card-top">
                         <div>
                           <h3>{course.title}</h3>
-                          <p>{course.level}</p>
+                          <p>{course.description || course.level}</p>
                         </div>
                         <div className="badge-stack">
                           <span className="badge">{course.sessions} sessions</span>
                           <span className="badge level-badge">{course.enrolledCount || 0} enrolled</span>
+                          <span className="badge">{(course.topics || []).length} topics</span>
                         </div>
                       </div>
                       <div className="course-card-meta">
                         <span>{pendingRequests.length} pending requests</span>
-                        <button type="button" className="btn-delete btn-delete-inline" onClick={() => handleDeleteCourse(course.id)} disabled={actionLoading}>
-                          Remove
-                        </button>
+                        <div className="course-inline-actions">
+                          <button
+                            type="button"
+                            className="btn-edit"
+                            onClick={() => handleEditCourse(course)}
+                            disabled={actionLoading}
+                          >
+                            Edit
+                          </button>
+                          <button type="button" className="btn-delete btn-delete-inline" onClick={() => handleDeleteCourse(course.id)} disabled={actionLoading}>
+                            Remove
+                          </button>
+                        </div>
                       </div>
 
                       {pendingRequests.length ? (
@@ -549,7 +751,6 @@ function AdminDashboard() {
               </form>
             </section>
           )}
-
         </main>
       </div>
     </div>

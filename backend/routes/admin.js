@@ -2,9 +2,39 @@ const express = require('express');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const Course = require('../models/Course');
-const { verifyToken, authorizeRoles, JWT_SECRET } = require('../middleware/authMiddleware');
+const { verifyToken, verifyTokenFlexible, authorizeRoles, JWT_SECRET } = require('../middleware/authMiddleware');
+const { sendEmail } = require('../services/emailService');
 
 const router = express.Router();
+
+const sanitizeTopics = (topics = []) => {
+  if (!Array.isArray(topics)) {
+    return [];
+  }
+
+  return topics
+    .map((topic, index) => ({
+      title: String(topic?.title || '').trim(),
+      videoUrl: String(topic?.videoUrl || topic?.video || '').trim(),
+      videoPath: String(topic?.videoPath || topic?.filePath || '').trim(),
+      transcript: String(topic?.transcript || '').trim(),
+      order: Number.isFinite(Number(topic?.order)) ? Number(topic.order) : index,
+    }))
+    .filter((topic) => topic.title);
+};
+
+const sanitizeCoursePayload = (body = {}) => {
+  return {
+    title: String(body.title || '').trim(),
+    description: String(body.description || '').trim(),
+    thumbnail: String(body.thumbnail || '').trim(),
+    sessions: body.sessions ? Number(body.sessions) : undefined,
+    level: body.level,
+    topics: sanitizeTopics(body.topics),
+  };
+};
+
+const isValidLevel = (level) => ['Beginner', 'Intermediate', 'Advanced'].includes(level);
 
 // POST /api/admin/create-admin - Create new admin (ADMIN ONLY)
 router.post('/create-admin', verifyToken, authorizeRoles('admin'), async (req, res) => {
@@ -43,6 +73,22 @@ router.post('/create-admin', verifyToken, authorizeRoles('admin'), async (req, r
     console.error('Create admin error:', error);
     return res.status(500).json({ error: 'Internal server error' });
   }
+});
+
+// GET /api/admin/monitoring/:service - Validate admin and redirect to monitoring URL
+router.get('/monitoring/:service', verifyTokenFlexible, authorizeRoles('admin'), async (req, res) => {
+  const service = String(req.params.service || '').toLowerCase();
+  const allowedTargets = {
+    grafana: '/grafana/',
+    prometheus: '/prometheus/',
+  };
+
+  const target = allowedTargets[service];
+  if (!target) {
+    return res.status(404).json({ error: 'Unknown monitoring service' });
+  }
+
+  return res.redirect(target);
 });
 
 // GET /api/admin/courses - List all courses (ADMIN ONLY)
@@ -109,6 +155,18 @@ router.post('/courses/:courseId/enroll', verifyToken, authorizeRoles('admin'), a
 
     await course.save();
 
+    if (!alreadyEnrolled) {
+      try {
+        await sendEmail({
+          to: user.email,
+          subject: 'Course Registration Confirmation',
+          text: `Hi ${user.name},\n\nYou have been enrolled in the course: ${course.title}.\n\nHappy learning!`,
+        });
+      } catch (emailError) {
+        console.warn('Enrollment email failed:', emailError.message);
+      }
+    }
+
     const updatedCourse = await Course.findById(courseId).populate('enrolledUsers', 'name email role');
     return res.status(200).json({ message: 'User enrolled successfully', course: updatedCourse.toJSON() });
   } catch (error) {
@@ -128,6 +186,121 @@ router.delete('/courses/:id', verifyToken, authorizeRoles('admin'), async (req, 
     return res.status(200).json({ message: 'Course deleted successfully' });
   } catch (error) {
     console.error('Delete course error:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// POST /api/admin/course - Create course with optional topics (ADMIN ONLY)
+router.post('/course', verifyToken, authorizeRoles('admin'), async (req, res) => {
+  try {
+    const payload = sanitizeCoursePayload(req.body);
+
+    if (!payload.title) {
+      return res.status(400).json({ error: 'Course title is required' });
+    }
+
+    if (payload.level && !isValidLevel(payload.level)) {
+      return res.status(400).json({ error: 'Invalid level value' });
+    }
+
+    const course = await Course.create({
+      title: payload.title,
+      description: payload.description,
+      thumbnail: payload.thumbnail,
+      sessions: payload.sessions || 1,
+      level: payload.level || 'Beginner',
+      topics: payload.topics,
+      enrolledUsers: [],
+      enrollmentRequests: [],
+    });
+
+    return res.status(201).json({ message: 'Course created successfully', course: course.toJSON() });
+  } catch (error) {
+    console.error('Create course (extended) error:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// PUT /api/admin/course/:id - Update course and topics (ADMIN ONLY)
+router.put('/course/:id', verifyToken, authorizeRoles('admin'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const payload = sanitizeCoursePayload(req.body);
+
+    if (!payload.title) {
+      return res.status(400).json({ error: 'Course title is required' });
+    }
+
+    if (payload.level && !isValidLevel(payload.level)) {
+      return res.status(400).json({ error: 'Invalid level value' });
+    }
+
+    const updateData = {
+      title: payload.title,
+      description: payload.description,
+      thumbnail: payload.thumbnail,
+      topics: payload.topics,
+    };
+
+    if (payload.sessions) {
+      updateData.sessions = payload.sessions;
+    }
+    if (payload.level) {
+      updateData.level = payload.level;
+    }
+
+    const updated = await Course.findByIdAndUpdate(id, updateData, { new: true });
+    if (!updated) {
+      return res.status(404).json({ error: 'Course not found' });
+    }
+
+    return res.status(200).json({ message: 'Course updated successfully', course: updated.toJSON() });
+  } catch (error) {
+    console.error('Update course error:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// DELETE /api/admin/course/:id - Delete course (ADMIN ONLY)
+router.delete('/course/:id', verifyToken, authorizeRoles('admin'), async (req, res) => {
+  try {
+    const removed = await Course.findByIdAndDelete(req.params.id);
+    if (!removed) {
+      return res.status(404).json({ error: 'Course not found' });
+    }
+
+    return res.status(200).json({ message: 'Course deleted successfully' });
+  } catch (error) {
+    console.error('Delete course (extended) error:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// POST /api/admin/course/:id/topic - Add topic to existing course (ADMIN ONLY)
+router.post('/course/:id/topic', verifyToken, authorizeRoles('admin'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const topicPayload = sanitizeTopics([req.body])[0];
+
+    if (!topicPayload?.title) {
+      return res.status(400).json({ error: 'Topic title is required' });
+    }
+
+    const course = await Course.findById(id);
+    if (!course) {
+      return res.status(404).json({ error: 'Course not found' });
+    }
+
+    const nextOrder = Number.isFinite(Number(topicPayload.order))
+      ? Number(topicPayload.order)
+      : course.topics.length;
+
+    course.topics.push({ ...topicPayload, order: nextOrder });
+    await course.save();
+
+    return res.status(201).json({ message: 'Topic added successfully', course: course.toJSON() });
+  } catch (error) {
+    console.error('Add topic error:', error);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -171,11 +344,13 @@ router.get('/stats', verifyToken, authorizeRoles('admin'), async (req, res) => {
     const totalUsers = await User.countDocuments();
     const totalAdmins = await User.countDocuments({ role: 'admin' });
     const totalRegularUsers = await User.countDocuments({ role: 'user' });
+    const totalCourses = await Course.countDocuments();
 
     return res.status(200).json({
       totalUsers,
       totalAdmins,
       totalRegularUsers,
+      totalCourses,
     });
   } catch (error) {
     console.error('Get stats error:', error);
