@@ -65,8 +65,17 @@ jobs:
           chmod 600 key.pem
 
           ssh -o StrictHostKeyChecking=no -i key.pem ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'EOF'
-            echo "SSH Connected ✅"
-            docker pull ${{ env.DOCKER_IMAGE }}:latest
+            set -e
+
+            echo "SSH Connected"
             cd ~/LMS-portal
-            docker-compose up -d --no-deps lms-frontend
+
+            if ! docker compose version >/dev/null 2>&1; then
+              sudo apt-get update
+              sudo apt-get install -y docker-compose-plugin
+            fi
+            docker compose version
+
+            docker pull ${{ secrets.DOCKER_USERNAME }}/lms-frontend:latest
+            docker compose up -d --no-deps lms-frontend
           EOF
