@@ -95,7 +95,7 @@ curl -X POST http://localhost/api/predict \
 
 ## Monitoring
 
-- **Grafana Dashboard**: http://localhost:3001 (admin/admin)
+- **Grafana Dashboard**: http://localhost:3001 (use the credentials from `.env`)
 - **Prometheus**: http://localhost:9090
 
 ## Documentation

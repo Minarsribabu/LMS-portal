@@ -324,7 +324,7 @@ lms-node-exporter:
 - ⚠️ Grafana exposed at 3001 (configure auth)
 
 ### Access Control
-- ⚠️ Default Grafana credentials (admin/admin)
+- ⚠️ Grafana credentials must come from the server `.env`
 - ✅ Metric endpoints require Docker network access
 - ✅ No sensitive data in metrics
 

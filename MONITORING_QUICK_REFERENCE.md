@@ -140,7 +140,7 @@ docker compose down
 ## 📈 Dashboard Usage
 
 1. **Open Grafana**: http://localhost:3001
-2. **Login**: admin/admin
+2. **Login**: use the credentials from `.env`
 3. **Navigate**: Dashboards → LMS Portal → **LMS Portal — Enhanced Observability Dashboard**
 4. **Customize**: Click dashboard settings to adjust refresh rate, time range
 5. **Drill Down**: Click on any panel to zoom/filter data
@@ -173,7 +173,7 @@ Edit `docker-compose.yml` (Prometheus command):
 ## 🔐 Security Notes
 
 ⚠️ **For Production:**
-- [ ] Change Grafana default password (admin/admin)
+- [ ] Set a non-default Grafana password in `.env`
 - [ ] Restrict metric endpoint access by IP
 - [ ] Use HTTPS for Grafana
 - [ ] Enable authentication on Prometheus

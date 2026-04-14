@@ -257,14 +257,14 @@ docker compose up -d
 | Service | URL | Credentials |
 |---------|-----|-------------|
 | Prometheus | http://localhost:9090 | — |
-| Grafana | http://localhost:3001 | admin/admin |
+| Grafana | http://localhost:3001 | credentials from `.env` |
 | Node Exporter | http://localhost:9100/metrics | — |
 | Backend Metrics | http://localhost:5000/metrics | — |
 | ML Service Metrics | http://localhost:8000/metrics | — |
 
 ### 3. View Enhanced Dashboard
 1. Open Grafana: http://localhost:3001
-2. Login with `admin/admin`
+2. Login with the credentials from `.env`
 3. Navigate to Dashboards → LMS Portal → **LMS Portal — Enhanced Observability Dashboard**
 
 ---

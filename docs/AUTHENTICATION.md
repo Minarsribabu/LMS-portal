@@ -305,7 +305,7 @@ Authorization: Bearer <token>
 PORT=5000
 MONGO_URI=mongodb://lms-mongo:27017/lms
 ML_SERVICE_URL=http://lms-ml:8000
-JWT_SECRET=your-super-secret-jwt-key-change-in-production-2024
+JWT_SECRET=change-this-in-production
 ```
 
 **⚠️ Important:** Change `JWT_SECRET` in production!

@@ -304,7 +304,7 @@ Prometheus:     🟢 UP
 
 3. **Access Dashboard**
    - Open http://localhost:3001
-   - Login: admin/admin
+   - Login: use the credentials from `.env`
    - View "LMS Portal — Enhanced Observability Dashboard"
 
 4. **Monitor**
