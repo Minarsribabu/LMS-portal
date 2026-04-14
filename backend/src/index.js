@@ -144,6 +144,21 @@ app.get('/api/courses', async (req, res) => {
   }
 });
 
+app.get('/api/courses/:id', async (req, res) => {
+  try {
+    const course = await Course.findById(req.params.id);
+
+    if (!course) {
+      return res.status(404).json({ error: 'Course not found' });
+    }
+
+    return res.json(course.toJSON());
+  } catch (err) {
+    console.error('[Backend] Failed to fetch course details:', err.message);
+    return res.status(500).json({ error: 'Failed to fetch course' });
+  }
+});
+
 app.post('/api/courses', async (req, res) => {
   try {
     const { title, sessions, level } = req.body;

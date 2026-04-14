@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
 import axiosService from '../services/axiosService';
-import CourseDetailModal from '../components/CourseDetailModal';
 
 const API_BASE = process.env.REACT_APP_API_URL || '/api';
 
@@ -10,10 +10,9 @@ function Home() {
   const user = JSON.parse(localStorage.getItem('user') || '{}');
   const [courses, setCourses] = useState([]);
   const [coursesLoading, setCoursesLoading] = useState(true);
-  const [requestingCourseId, setRequestingCourseId] = useState('');
-  const [selectedCourse, setSelectedCourse] = useState(null);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (!message && !error) {
@@ -51,38 +50,9 @@ function Home() {
     loadCourses();
   }, [isAuthenticated, user?.role]);
 
-  const openCourseDetails = (course) => {
-    setSelectedCourse(course);
+  const openCourseDetails = (courseId) => {
+    navigate(`/course/${courseId}`);
   };
-
-  const closeCourseDetails = () => {
-    setSelectedCourse(null);
-  };
-
-  const handleRequestEnrollment = async (courseId) => {
-    setRequestingCourseId(courseId);
-    setError('');
-    setMessage('');
-
-    try {
-      const response = await axiosService.post(`/user/courses/${courseId}/request-enrollment`);
-      setMessage(response.data.message || 'Enrollment request submitted');
-      await loadCourses();
-    } catch (requestError) {
-      setError(requestError.response?.data?.error || 'Failed to request enrollment');
-    } finally {
-      setRequestingCourseId('');
-    }
-  };
-
-  const selectedCourseStatus = useMemo(() => {
-    if (!selectedCourse) {
-      return 'none';
-    }
-
-    const latest = courses.find((course) => course.id === selectedCourse.id);
-    return latest?.enrollmentStatus || selectedCourse.enrollmentStatus || 'none';
-  }, [courses, selectedCourse]);
 
   const statusMap = useMemo(
     () => ({
@@ -134,11 +104,11 @@ function Home() {
                   key={course.id}
                   type="button"
                   className="card course-card home-course-card course-card-button"
-                  onClick={() => openCourseDetails(course)}
+                  onClick={() => openCourseDetails(course.id)}
                 >
                   <div className="card-icon" aria-label={`${course.title} icon`}>{courseIcon}</div>
                   <h3>{course.title}</h3>
-                  <p>Tap to view full course details, level guidance, and enrollment action.</p>
+                  <p>Open the course detail page to explore topics, videos, and transcripts.</p>
                   <div className="course-meta">
                     <span className="badge">{course.sessions} Sessions</span>
                     <span className="badge badge-green">{course.level}</span>
@@ -153,16 +123,6 @@ function Home() {
         )}
       </section>
 
-      <CourseDetailModal
-        course={selectedCourse}
-        isOpen={!!selectedCourse}
-        isAuthenticated={isAuthenticated}
-        isUserRole={user?.role === 'user'}
-        enrollmentStatus={selectedCourseStatus}
-        requesting={requestingCourseId === selectedCourse?.id}
-        onClose={closeCourseDetails}
-        onRequestEnrollment={handleRequestEnrollment}
-      />
     </div>
   );
 }

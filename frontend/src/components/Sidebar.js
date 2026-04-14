@@ -2,8 +2,6 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 
 function Sidebar({ activeTab, setActiveTab, isAdmin }) {
-  const monitoringToken = localStorage.getItem('token') || '';
-
   const adminItems = [
     { key: 'home', label: 'Home', icon: '🏠', isHome: true },
     { key: 'overview', label: 'Overview', icon: '▦' },
@@ -51,29 +49,6 @@ function Sidebar({ activeTab, setActiveTab, isAdmin }) {
           );
         })}
       </nav>
-      {isAdmin && (
-        <div className="sidebar-monitoring">
-          <p className="sidebar-monitoring-title">Monitoring</p>
-          <a
-            href={`/api/admin/monitoring/grafana?token=${encodeURIComponent(monitoringToken)}`}
-            target="_blank"
-            rel="noreferrer"
-            className="sidebar-item sidebar-monitor-link"
-          >
-            <span className="sidebar-icon" aria-hidden="true">📈</span>
-            <span>Grafana</span>
-          </a>
-          <a
-            href={`/api/admin/monitoring/prometheus?token=${encodeURIComponent(monitoringToken)}`}
-            target="_blank"
-            rel="noreferrer"
-            className="sidebar-item sidebar-monitor-link"
-          >
-            <span className="sidebar-icon" aria-hidden="true">🧭</span>
-            <span>Prometheus</span>
-          </a>
-        </div>
-      )}
     </aside>
   );
 }

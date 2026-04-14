@@ -9,6 +9,7 @@ import Register from './pages/Register';
 import UserDashboard from './pages/UserDashboard';
 import AdminDashboard from './pages/AdminDashboard';
 import AdminDetailView from './pages/AdminDetailView';
+import CourseDetailPage from './pages/CourseDetailPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import ProfileDropdown from './components/ProfileDropdown';
 
@@ -188,6 +189,7 @@ function AppShell() {
         />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/course/:id" element={<CourseDetailPage />} />
         <Route 
           path="/user-dashboard" 
           element={

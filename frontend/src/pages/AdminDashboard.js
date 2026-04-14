@@ -30,8 +30,6 @@ function AdminDashboard() {
   const [actionLoading, setActionLoading] = useState(false);
   const navigate = useNavigate();
 
-  const monitoringToken = localStorage.getItem('token') || '';
-
   const userOptions = useMemo(() => users.filter((item) => item.role === 'user'), [users]);
   const pendingRequestsByCourse = useMemo(
     () => courses
@@ -332,26 +330,6 @@ function AdminDashboard() {
         <main className="admin-content-area">
           {message && <div className="success-message success-inline">{message}</div>}
           {error && <div className="error-message error-inline">{error}</div>}
-
-          <section className="admin-monitoring-bar" aria-label="Monitoring">
-            <span className="monitoring-title">Monitoring</span>
-            <a
-              className="monitoring-link"
-              href={`/api/admin/monitoring/grafana?token=${encodeURIComponent(monitoringToken)}`}
-              target="_blank"
-              rel="noreferrer"
-            >
-              Grafana
-            </a>
-            <a
-              className="monitoring-link"
-              href={`/api/admin/monitoring/prometheus?token=${encodeURIComponent(monitoringToken)}`}
-              target="_blank"
-              rel="noreferrer"
-            >
-              Prometheus
-            </a>
-          </section>
 
           {activeTab === 'overview' && stats && (
             <section className="stats-container">

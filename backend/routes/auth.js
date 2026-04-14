@@ -39,15 +39,11 @@ router.post('/register', async (req, res) => {
     // Generate token
     const token = generateToken(newUser);
 
-    try {
-      await sendEmail({
-        to: newUser.email,
-        subject: 'Welcome to LMS Portal',
-        text: `Hi ${newUser.name},\n\nWelcome to LMS Portal. Your account has been created successfully.\n\nHappy learning!`,
-      });
-    } catch (emailError) {
-      console.warn('Welcome email failed:', emailError.message);
-    }
+    await sendEmail({
+      to: newUser.email,
+      subject: 'Welcome to LMS Portal',
+      text: `Hi ${newUser.name},\n\nWelcome to LMS Portal. Your account has been created successfully.\n\nHappy learning!`,
+    });
 
     return res.status(201).json({
       message: 'User registered successfully',

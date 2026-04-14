@@ -3,7 +3,7 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const Course = require('../models/Course');
 const { verifyToken, verifyTokenFlexible, authorizeRoles, JWT_SECRET } = require('../middleware/authMiddleware');
-const { sendEmail } = require('../services/emailService');
+const { enrollUserInCourse } = require('../services/enrollmentService');
 
 const router = express.Router();
 
@@ -75,20 +75,9 @@ router.post('/create-admin', verifyToken, authorizeRoles('admin'), async (req, r
   }
 });
 
-// GET /api/admin/monitoring/:service - Validate admin and redirect to monitoring URL
+// Monitoring redirects removed to avoid exposing direct access paths
 router.get('/monitoring/:service', verifyTokenFlexible, authorizeRoles('admin'), async (req, res) => {
-  const service = String(req.params.service || '').toLowerCase();
-  const allowedTargets = {
-    grafana: '/grafana/',
-    prometheus: '/prometheus/',
-  };
-
-  const target = allowedTargets[service];
-  if (!target) {
-    return res.status(404).json({ error: 'Unknown monitoring service' });
-  }
-
-  return res.redirect(target);
+  return res.status(404).json({ error: 'Unknown monitoring service' });
 });
 
 // GET /api/admin/courses - List all courses (ADMIN ONLY)
@@ -141,31 +130,7 @@ router.post('/courses/:courseId/enroll', verifyToken, authorizeRoles('admin'), a
       return res.status(404).json({ error: 'User not found' });
     }
 
-    const alreadyEnrolled = course.enrolledUsers.some((entry) => entry.toString() === userId);
-    if (!alreadyEnrolled) {
-      course.enrolledUsers.push(userId);
-    }
-
-    const requestEntry = (course.enrollmentRequests || []).find(
-      (entry) => entry.user.toString() === userId
-    );
-    if (requestEntry) {
-      requestEntry.status = 'approved';
-    }
-
-    await course.save();
-
-    if (!alreadyEnrolled) {
-      try {
-        await sendEmail({
-          to: user.email,
-          subject: 'Course Registration Confirmation',
-          text: `Hi ${user.name},\n\nYou have been enrolled in the course: ${course.title}.\n\nHappy learning!`,
-        });
-      } catch (emailError) {
-        console.warn('Enrollment email failed:', emailError.message);
-      }
-    }
+    await enrollUserInCourse({ course, user });
 
     const updatedCourse = await Course.findById(courseId).populate('enrolledUsers', 'name email role');
     return res.status(200).json({ message: 'User enrolled successfully', course: updatedCourse.toJSON() });
