@@ -7,6 +7,7 @@
     "start": "node seedAdmin.js && node src/index.js",
     "dev": "node --watch src/index.js",
     "seed-admin": "node seedAdmin.js",
+    "test-email": "node test-email.js",
     "test": "echo \"Tests passed\" && exit 0"
   },
   "dependencies": {

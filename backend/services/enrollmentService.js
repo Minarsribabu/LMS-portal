@@ -1,9 +1,5 @@
 const Enrollment = require('../models/Enrollment');
-const { sendEmail } = require('./emailService');
-
-const buildEnrollmentEmailText = (name, courseTitle) => (
-  `Hi ${name},\n\nYour enrollment in ${courseTitle} is confirmed.\n\nYou can now open the course detail page to review topics, videos, and transcripts.\n\nHappy learning!`
-);
+const { sendCourseEnrollmentEmail } = require('./emailService');
 
 const enrollUserInCourse = async ({ course, user }) => {
   const userId = user._id.toString();
@@ -30,11 +26,11 @@ const enrollUserInCourse = async ({ course, user }) => {
   );
 
   if (!existingEnrollment) {
-    await sendEmail({
-      to: user.email,
-      subject: 'Course Enrollment Confirmation',
-      text: buildEnrollmentEmailText(user.name, course.title),
-    });
+    try {
+      await sendCourseEnrollmentEmail(user.email, course.title);
+    } catch (error) {
+      console.error('Email failed:', error.message);
+    }
   }
 
   return {

@@ -7,33 +7,21 @@ const buildTransporter = () => {
     return transporter;
   }
 
-  const user = process.env.EMAIL_USER || process.env.SMTP_USER;
-  const pass = process.env.EMAIL_PASS || process.env.SMTP_PASS;
-  const host = process.env.EMAIL_HOST || process.env.SMTP_HOST || 'smtp.gmail.com';
-  const port = Number(process.env.EMAIL_PORT || process.env.SMTP_PORT || 587);
-  const service = process.env.EMAIL_SERVICE || process.env.SMTP_SERVICE || (!process.env.EMAIL_HOST && !process.env.SMTP_HOST ? 'gmail' : undefined);
+  const user = process.env.EMAIL_USER;
+  const pass = process.env.EMAIL_PASS;
 
-  if (!host || !user || !pass) {
+  if (!user || !pass) {
+    console.warn('Email skipped: EMAIL_USER and EMAIL_PASS are not configured');
     return null;
   }
 
-  const transportConfig = service
-    ? {
-        service,
-        auth: {
-          user,
-          pass,
-        },
-      }
-    : {
-        host,
-        port,
-        secure: port === 465,
-        auth: {
-          user,
-          pass,
-        },
-      };
+  const transportConfig = {
+    service: 'gmail',
+    auth: {
+      user,
+      pass,
+    },
+  };
 
   transporter = nodemailer.createTransport(transportConfig);
 
@@ -42,10 +30,10 @@ const buildTransporter = () => {
 
 const sendEmail = async ({ to, subject, text }) => {
   const activeTransporter = buildTransporter();
-  const from = process.env.EMAIL_FROM || process.env.SMTP_FROM || process.env.EMAIL_USER || process.env.SMTP_USER;
+  const from = process.env.EMAIL_FROM || process.env.EMAIL_USER;
 
   if (!activeTransporter || !from || !to) {
-    console.warn('Email failed');
+    console.warn('Email skipped: SMTP configuration is incomplete');
     return { sent: false, reason: 'smtp_not_configured' };
   }
 
@@ -65,6 +53,24 @@ const sendEmail = async ({ to, subject, text }) => {
   }
 };
 
+const sendWelcomeEmail = async (userEmail, username) => {
+  return sendEmail({
+    to: userEmail,
+    subject: 'Welcome to LMS Portal',
+    text: `Hello ${username}, welcome to LMS Portal!`,
+  });
+};
+
+const sendCourseEnrollmentEmail = async (userEmail, courseName) => {
+  return sendEmail({
+    to: userEmail,
+    subject: 'Course Enrollment Confirmation',
+    text: `You have successfully enrolled in ${courseName}`,
+  });
+};
+
 module.exports = {
   sendEmail,
+  sendWelcomeEmail,
+  sendCourseEnrollmentEmail,
 };

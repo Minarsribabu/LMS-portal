@@ -2,7 +2,7 @@ const express = require('express');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const { JWT_SECRET } = require('../middleware/authMiddleware');
-const { sendEmail } = require('../services/emailService');
+const { sendWelcomeEmail } = require('../services/emailService');
 
 const router = express.Router();
 
@@ -39,11 +39,11 @@ router.post('/register', async (req, res) => {
     // Generate token
     const token = generateToken(newUser);
 
-    await sendEmail({
-      to: newUser.email,
-      subject: 'Welcome to LMS Portal',
-      text: `Hi ${newUser.name},\n\nWelcome to LMS Portal. Your account has been created successfully.\n\nHappy learning!`,
-    });
+    try {
+      await sendWelcomeEmail(newUser.email, newUser.name);
+    } catch (error) {
+      console.error('Email failed:', error.message);
+    }
 
     return res.status(201).json({
       message: 'User registered successfully',
