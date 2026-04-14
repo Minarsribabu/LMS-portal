@@ -3,6 +3,7 @@ const User = require('../models/User');
 const Course = require('../models/Course');
 const Progress = require('../models/Progress');
 const { verifyToken, authorizeRoles } = require('../middleware/authMiddleware');
+const { sendCourseCompletionEmail } = require('../services/emailService');
 
 const router = express.Router();
 
@@ -145,11 +146,24 @@ router.post('/progress', verifyToken, async (req, res) => {
       return res.status(404).json({ error: 'Topic not found in this course' });
     }
 
+    const totalTopics = Array.isArray(course.topics) ? course.topics.length : 0;
+    const completedBeforeUpdate = await Progress.countDocuments({ userId, courseId, status: 'completed' });
+
     const progress = await Progress.findOneAndUpdate(
       { userId, courseId, topicId },
       { $set: { status: 'completed', completedAt: new Date() } },
       { upsert: true, new: true, setDefaultsOnInsert: true }
     );
+
+    const completedAfterUpdate = await Progress.countDocuments({ userId, courseId, status: 'completed' });
+
+    if (totalTopics > 0 && completedBeforeUpdate < totalTopics && completedAfterUpdate >= totalTopics) {
+      try {
+        await sendCourseCompletionEmail(req.user.email || '', course.title);
+      } catch (emailError) {
+        console.error('Email failed:', emailError.message);
+      }
+    }
 
     return res.status(201).json({ message: 'Topic marked as completed', progress: progress.toJSON() });
   } catch (error) {
