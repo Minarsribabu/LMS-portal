@@ -7,9 +7,8 @@ const buildTransporter = () => {
     return transporter;
   }
 
-  const user = process.env.EMAIL_USER || process.env.SMTP_USER;
-  const pass = process.env.EMAIL_PASS || process.env.SMTP_PASS;
-  const service = process.env.EMAIL_SERVICE || process.env.SMTP_SERVICE || 'gmail';
+  const user = process.env.EMAIL_USER;
+  const pass = process.env.EMAIL_PASS;
 
   if (!user || !pass) {
     console.warn('Email skipped: EMAIL_USER and EMAIL_PASS are not configured');
@@ -17,7 +16,7 @@ const buildTransporter = () => {
   }
 
   const transportConfig = {
-    service,
+    service: 'gmail',
     auth: {
       user,
       pass,
@@ -31,7 +30,7 @@ const buildTransporter = () => {
 
 const sendEmail = async ({ to, subject, text }) => {
   const activeTransporter = buildTransporter();
-  const from = process.env.EMAIL_FROM || process.env.SMTP_FROM || process.env.EMAIL_USER || process.env.SMTP_USER;
+  const from = process.env.EMAIL_FROM || process.env.EMAIL_USER;
 
   if (!activeTransporter || !from || !to) {
     console.warn('Email skipped: SMTP configuration is incomplete');
@@ -70,17 +69,8 @@ const sendCourseEnrollmentEmail = async (userEmail, courseName) => {
   });
 };
 
-const sendCourseCompletionEmail = async (userEmail, courseName) => {
-  return sendEmail({
-    to: userEmail,
-    subject: 'Course Completion Congratulations',
-    text: `Congratulations! You have successfully completed ${courseName}.`,
-  });
-};
-
 module.exports = {
   sendEmail,
   sendWelcomeEmail,
   sendCourseEnrollmentEmail,
-  sendCourseCompletionEmail,
 };
